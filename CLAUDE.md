@@ -2,12 +2,13 @@
 
 Repository guidance for AI coding agents and contributors working on `strava_async`.
 
-Status: greenfield. Only `main.py` and `pyproject.toml` exist so far — the layout and
-patterns below describe the target design, not code you will find on disk yet. Build
-toward them; do not invent a second structure.
+All 34 operations in the spec are implemented across nine services. The layout and
+patterns below describe the code as it stands; follow them rather than inventing a second
+structure.
 
 The API surface is pinned by `context/strava_swagger.json` (Strava API v3, Swagger 2.0).
-Treat that file as the source of truth for paths, parameters, enums, and required scopes.
+Treat that file as the source of truth for paths, parameters, enums, and required scopes —
+it is what `tests/test_architecture.py` counts endpoints against.
 
 ## Project Summary
 
@@ -88,8 +89,9 @@ context/           # strava_swagger.json — the pinned API contract
 ### Layering (enforced by `tests/test_architecture.py`)
 
 ```
-settings / protocols / exceptions / auth   <- foundation: no internal imports at all
-schemas                                    <- may import stdlib + pydantic only
+settings / protocols / exceptions          <- foundation: no internal imports at all
+auth                                       <- may import exceptions only
+schemas                                    <- may import stdlib + pydantic + schemas
 services/base.py                           <- imports protocols + exceptions only
 services/<service>.py                      <- imports base + schemas + protocols
 registry.py                                <- imports services + settings
@@ -156,10 +158,12 @@ and (except `_delete`/`_get_text`/`_get_bytes`) a `model` to validate the respon
 never bypass them with a raw `self._session.request(...)`, or you lose rate limiting,
 retries, and error mapping.
 
-**Strava-specific:** the v3 API takes **form data, not JSON**, on every write. `POST
-/activities` and `PUT /segments/{id}/starred` take `formData` fields; `PUT /athlete` and
-`POST /uploads` are `multipart/form-data`. Every response is JSON except the two route
-exports. So `fetch_data` covers reads only — plan the write helpers accordingly.
+**Strava-specific:** the v3 API takes **form data, not JSON**, on almost every write.
+`POST /activities` and `PUT /segments/{id}/starred` take `formData` fields; `PUT /athlete`
+and `POST /uploads` are `multipart/form-data`. The single exception is
+`PUT /activities/{id}`, which the swagger declares `in: body` — that one is JSON and goes
+through `fetch_data(method="PUT", payload=...)`. Every response is JSON except the two
+route exports.
 
 ### Service methods are declarative
 
