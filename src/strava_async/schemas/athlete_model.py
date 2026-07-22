@@ -24,8 +24,8 @@ __all__ = [
 class SummaryAthlete(ResponseModel):
     """An athlete as embedded in another resource, or listed.
 
-    Everything is optional: a kudoer comes back as nothing but a first and last name,
-    while ``/athlete`` returns the full profile.
+    Everything is optional, including ``id``: a kudoer and a club admin both come back as
+    nothing but a first and last name. :class:`DetailedAthlete` tightens ``id`` back up.
     """
 
     id: int | None = None
@@ -59,6 +59,8 @@ class DetailedAthlete(SummaryAthlete):
     ``ftp`` and ``weight`` require ``profile:read_all`` and are null for most athletes.
     """
 
+    # Narrowed from the summary form: whoever this endpoint describes, it identifies them.
+    id: int
     follower_count: int | None = None
     friend_count: int | None = None
     mutual_friend_count: int | None = None

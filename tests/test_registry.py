@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from strava_async.rate_limit import CompositeLimiter
 from strava_async.registry import build_service_registry
 from strava_async.services.activities import ActivitiesService
 from strava_async.services.base import Base
@@ -54,12 +55,16 @@ def test_all_services_share_the_configured_base_url() -> None:
     assert {config.base_url for config in registry.values()} == {"https://example.test/v3"}
 
 
-def test_limiter_reflects_the_configured_budget() -> None:
-    registry = build_service_registry(make_settings(requests_per_quarter_hour=200))
+def test_limiter_reflects_both_configured_budgets() -> None:
+    """Strava budgets a short window and a daily one; both must be enforced."""
+    registry = build_service_registry(
+        make_settings(requests_per_quarter_hour=200, daily_request_limit=2000)
+    )
     limiter = registry["activities"].limiter
+    assert isinstance(limiter, CompositeLimiter)
 
-    assert limiter.max_rate == 200
-    assert limiter.time_period == 900
+    windows = [(inner.max_rate, inner.time_period) for inner in limiter.limiters]
+    assert windows == [(200, 900), (2000, 86_400)]
 
 
 def test_activities_maps_to_the_activities_service() -> None:

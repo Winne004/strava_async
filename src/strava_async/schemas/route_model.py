@@ -30,7 +30,7 @@ class Route(ResponseModel):
     3 cross, 4 trail, 5 mixed.
     """
 
-    id: int | None = None
+    id: int
     id_str: str | None = None
     resource_state: int | None = None
     name: str | None = None

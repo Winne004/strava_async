@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 from typing import Any, BinaryIO
 
 import aiohttp
-from aiolimiter import AsyncLimiter
 from pydantic import BaseModel, TypeAdapter
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception_type, stop_after_attempt
 from tenacity.wait import wait_exponential
@@ -22,7 +21,7 @@ from strava_async.exceptions import (
     StravaRateLimitError,
     map_status_code_to_exception,
 )
-from strava_async.protocols import AuthClientProtocol
+from strava_async.protocols import AuthClientProtocol, RateLimiterProtocol
 
 __all__ = ["Base"]
 
@@ -59,8 +58,9 @@ class Base:
         session: The session owned by the client.
         base_url: Root URL for this service's endpoints.
         auth_client: Supplies and invalidates the OAuth token.
-        limiter: The app-wide rate limiter. Every service shares one instance — Strava's
-            quota is per application, not per endpoint family.
+        limiter: The app-wide rate limiter, covering both of Strava's quota windows.
+            Every service shares one instance — the quota is per application, not per
+            endpoint family.
         max_retry_attempts: Total attempts, including the first.
         max_retry_wait_seconds: Ceiling on any single backoff. Caps a 429 whose window is
             fifteen minutes from resetting.
@@ -74,7 +74,7 @@ class Base:
         session: aiohttp.ClientSession,
         base_url: str,
         auth_client: AuthClientProtocol,
-        limiter: AsyncLimiter,
+        limiter: RateLimiterProtocol,
         *,
         max_retry_attempts: int = 4,
         max_retry_wait_seconds: float = 60.0,

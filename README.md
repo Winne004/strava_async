@@ -1,5 +1,7 @@
 # strava-async
 
+[![CI](https://github.com/Winne004/strava_async/actions/workflows/ci.yml/badge.svg)](https://github.com/Winne004/strava_async/actions/workflows/ci.yml)
+
 An async Python client for the [Strava API v3](https://developers.strava.com/docs/reference/).
 
 Fully typed, `asyncio`-native, and declarative: every request body and query string is a
@@ -21,10 +23,10 @@ async with initialise_strava_client() as client:
     print(f"{athlete.firstname}: {len(activities)} activities")
 ```
 
-> **Status: pre-release.** The request pipeline, auth, and parameter handling are well
-> covered by tests. The *response* models for several endpoints were written from Strava's
-> documentation rather than from recorded live responses — see
-> [Known limitations](#known-limitations) before relying on them in production.
+> **Status: pre-release.** The pipeline, auth, and parameter handling are well covered, and
+> every model is validated against payloads Strava publishes in its own spec — except the
+> `routes` and `uploads` models, for which no example exists. See
+> [Known limitations](#known-limitations) before relying on those two.
 
 ## Requirements
 
@@ -216,6 +218,9 @@ Because Strava does not reliably send `Retry-After`, a `429` falls back to the t
 remaining in the current 15-minute window, capped by `max_retry_wait_seconds` so it never
 becomes a quarter-hour hang.
 
+Both of Strava's windows are enforced at once — the 15-minute budget and the daily one — by
+a composite limiter shared across every service.
+
 The defaults are Strava's published figures, but limits are set per application and have
 changed over time. **Check yours** at
 [developers.strava.com/docs/rate-limits](https://developers.strava.com/docs/rate-limits)
@@ -236,7 +241,7 @@ export STRAVA_DAILY_REQUEST_LIMIT=2000
 | `STRAVA_BASE_URL` | `https://www.strava.com/api/v3` | API root |
 | `STRAVA_TOKEN_URL` | `.../oauth/token` | Token endpoint |
 | `STRAVA_REQUESTS_PER_QUARTER_HOUR` | `100` | Short-window budget |
-| `STRAVA_DAILY_REQUEST_LIMIT` | `1000` | Daily budget (see limitations) |
+| `STRAVA_DAILY_REQUEST_LIMIT` | `1000` | Daily budget |
 | `STRAVA_MAX_RETRY_ATTEMPTS` | `4` | Total attempts, including the first |
 | `STRAVA_MAX_RETRY_WAIT_SECONDS` | `60` | Ceiling on any single backoff |
 | `STRAVA_TOKEN_EXPIRY_MARGIN_SECONDS` | `300` | Refresh this early |
@@ -247,14 +252,13 @@ export STRAVA_DAILY_REQUEST_LIMIT=2000
 
 Worth reading before you depend on this:
 
-- **Some response models are unverified.** The spec embeds example payloads for many
-  endpoints but not all. Models for `Route`, `Upload`, `ActivityStats`, `Zones`,
-  `ActivityZone` and a few others were written from Strava's documentation rather than
-  recorded responses. Because response fields are all optional, a wrong field name reads as
-  `None` rather than raising — so a mistake here is quiet. Verify against live data before
-  trusting these.
-- **The daily rate limit is not enforced.** `STRAVA_DAILY_REQUEST_LIMIT` is read but
-  currently unused; only the 15-minute window is paced.
+- **The `routes` and `uploads` models are unverified.** Every model is now checked against a
+  payload Strava publishes in the spec (see `tests/fixtures/`) — except these two services,
+  for which the spec carries no example. Their fields come from Strava's prose docs and have
+  never been matched against a real response. `tests/test_fixtures.py` asserts that this gap
+  is exactly two services, so it cannot quietly widen.
+- **`ActivityStats` and activity zones are likewise unexampled**, even though their services
+  are otherwise covered.
 - **No pagination helper.** List endpoints take `page`/`per_page` and return one page. There
   is no auto-paginating iterator — deliberate for now, but you will write that loop yourself.
 - **Two spec defects are worked around.** `PUT /athlete` declares `weight` as a path
@@ -272,13 +276,26 @@ uv run ruff format
 uv run ty check
 ```
 
-The suite is offline and clock-free — no network, no real sleeps, no dependence on the
-current time.
+Those four gates run in CI on every push and pull request. To catch failures before you
+push, install the git hook — it runs the same four:
 
-`tests/test_architecture.py` parses the source to enforce the design: import boundaries
-between layers, and the declarative service style (one delegating call per method, no
-`dict`/`Any` in a signature). It also asserts the endpoint count against the spec, so a new
-endpoint that skips a model or hides logic in a service fails the suite.
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
+
+The suite is offline and clock-free — no network, no real sleeps, no dependence on the
+current time. Three parts do the heavy lifting:
+
+- **`tests/test_architecture.py`** parses the source to enforce the design: import
+  boundaries between layers, and the declarative service style (one delegating call per
+  method, no `dict`/`Any` in a signature). It also asserts the endpoint count against the
+  spec, so a new endpoint that skips a model or hides logic in a service fails the suite.
+- **`tests/test_fixtures.py`** validates every response model against payloads extracted
+  from the spec's `examples` blocks, and pins their provenance so a fixture cannot be edited
+  to make a failing model pass.
+- **`tests/test_integration.py`** drives each service through the real pipeline with a fake
+  session, so the service/`Base` seam is covered by something other than mock assertions.
 
 Contributions should follow the patterns in [CLAUDE.md](CLAUDE.md), which documents the
 architecture and the change recipes for adding an endpoint, a service, or an error type.

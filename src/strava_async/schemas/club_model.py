@@ -10,7 +10,7 @@ __all__ = ["ClubActivity", "ClubActivityAthlete", "DetailedClub", "SummaryClub"]
 class SummaryClub(ResponseModel):
     """A club as listed."""
 
-    id: int | None = None
+    id: int
     resource_state: int | None = None
     name: str | None = None
     profile: str | None = None

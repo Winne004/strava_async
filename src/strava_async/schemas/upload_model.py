@@ -20,7 +20,7 @@ class Upload(ResponseModel):
     fails. Both null means Strava is still working.
     """
 
-    id: int | None = None
+    id: int
     id_str: str | None = None
     external_id: str | None = None
     error: str | None = None

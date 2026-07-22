@@ -8,7 +8,7 @@ __all__ = ["DetailedGear", "SummaryGear"]
 class SummaryGear(ResponseModel):
     """Gear as embedded in an athlete profile."""
 
-    id: str | None = None
+    id: str
     resource_state: int | None = None
     primary: bool | None = None
     name: str | None = None
