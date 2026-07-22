@@ -5,8 +5,8 @@ Adding a service is an entry here plus a property on the client.
 
 from dataclasses import dataclass
 
-from aiolimiter import AsyncLimiter
-
+from strava_async.protocols import RateLimiterProtocol
+from strava_async.rate_limit import build_rate_limiter
 from strava_async.services.activities import ActivitiesService
 from strava_async.services.athletes import AthletesService
 from strava_async.services.base import Base
@@ -20,8 +20,6 @@ from strava_async.services.uploads import UploadsService
 from strava_async.settings import StravaSettings
 
 __all__ = ["ServiceConfig", "ServiceRegistry", "build_service_registry"]
-
-_QUARTER_HOUR_SECONDS = 15 * 60
 
 _SERVICE_CLASSES: dict[str, type[Base]] = {
     "activities": ActivitiesService,
@@ -42,7 +40,7 @@ class ServiceConfig:
 
     service_class: type[Base]
     base_url: str
-    limiter: AsyncLimiter
+    limiter: RateLimiterProtocol
 
 
 type ServiceRegistry = dict[str, ServiceConfig]
@@ -56,12 +54,15 @@ def build_service_registry(settings: StravaSettings) -> ServiceRegistry:
     effective request rate by the number of services and get the app throttled.
 
     Args:
-        settings: Configuration supplying the base URL and the rate budget.
+        settings: Configuration supplying the base URL and both rate budgets.
 
     Returns:
         A mapping of service name to its configuration.
     """
-    limiter = AsyncLimiter(settings.requests_per_quarter_hour, _QUARTER_HOUR_SECONDS)
+    limiter = build_rate_limiter(
+        requests_per_quarter_hour=settings.requests_per_quarter_hour,
+        daily_request_limit=settings.daily_request_limit,
+    )
     return {
         name: ServiceConfig(
             service_class=service_class,

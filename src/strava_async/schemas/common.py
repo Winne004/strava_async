@@ -2,7 +2,7 @@
 
 from strava_async.schemas.base import ResponseModel
 
-__all__ = ["LatLng", "MetaActivity", "MetaAthlete", "MetaClub", "PolylineMap"]
+__all__ = ["LatLng", "MetaActivity", "MetaAthlete", "PolylineMap"]
 
 # Strava sends coordinates as a two-element [latitude, longitude] array, and sends an
 # empty array (not null) when it has none.
@@ -12,23 +12,15 @@ type LatLng = list[float]
 class MetaAthlete(ResponseModel):
     """An athlete reduced to an identifier."""
 
-    id: int | None = None
+    id: int
     resource_state: int | None = None
 
 
 class MetaActivity(ResponseModel):
     """An activity reduced to an identifier."""
 
-    id: int | None = None
+    id: int
     resource_state: int | None = None
-
-
-class MetaClub(ResponseModel):
-    """A club reduced to an identifier and name."""
-
-    id: int | None = None
-    resource_state: int | None = None
-    name: str | None = None
 
 
 class PolylineMap(ResponseModel):

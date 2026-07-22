@@ -64,7 +64,8 @@ src/strava_async/
   client.py        # StravaClient: async context manager, lazy service properties
   initialise.py    # initialise_strava_client(): builds settings, registry, auth, client
   settings.py      # pydantic-settings: OAuth credentials + base URL + rate limits
-  registry.py      # service name -> (class, base_url, rate limit)
+  rate_limit.py    # composite limiter over Strava's 15-minute and daily windows
+  registry.py      # service name -> (class, base_url, shared limiter)
   protocols.py     # structural types (e.g. AuthClientProtocol) — no internal imports
   exceptions.py    # exception hierarchy + HTTP status -> exception mapping
   auth/            # token refresh, caching, invalidation
@@ -80,7 +81,9 @@ src/strava_async/
     streams.py         # /{resource}/{id}/streams
     uploads.py         # /uploads
   schemas/         # Pydantic models: responses, form bodies, query params
-tests/             # pytest suite, mirrors the src layout
+tests/
+  fixtures/        # response payloads extracted from the spec's examples blocks
+  ...              # pytest suite, mirrors the src layout
 context/           # strava_swagger.json — the pinned API contract
 ```
 
@@ -363,8 +366,13 @@ plus a property.
 base URL `https://www.strava.com/api/v3`, and the rate limit is **app-wide, not
 per-service**. Do not give each service its own independent limiter — that would
 multiply the effective request rate by the number of services and get the app throttled.
-Keep one shared `AsyncLimiter` (or a small limiter object) on the client and hand the
-same instance to every service via the registry.
+`build_service_registry` builds one `CompositeLimiter` and hands the same instance to
+every entry; `tests/test_registry.py` asserts that identity.
+
+`rate_limit.py` holds that composite, which acquires a slot in **both** of Strava's
+windows — the 15-minute budget and the daily one — before a request proceeds. One
+`AsyncLimiter` can only model one window, and pacing only the short one lets a steady
+drip exhaust the day's quota unchecked.
 
 **Rate limits.** Strava enforces two windows — a 15-minute window that resets on natural
 quarter-hour boundaries, and a daily window that resets at midnight UTC — with separate
@@ -466,6 +474,11 @@ Modelling notes:
   wall-clock in the activity's timezone. Do not "helpfully" convert.
 - Nullable-everywhere is real: fields like `ftp`, `weight`, `external_id`, and
   `upload_id` come back `null` for many athletes. Default to `| None`.
+- **`id` is the exception.** It is required on every model whose fixture proves it is
+  always sent, because an all-optional model validates `{}` — which makes a misspelled
+  field indistinguishable from a null and quietly unfalsifiable. `SummaryAthlete` and
+  `ClubAthlete` keep `id` optional on purpose: a kudoer and a club admin really do come
+  back as nothing but two names. Only tighten a field the fixtures support.
 
 ## Change Patterns
 
@@ -519,8 +532,15 @@ Modelling notes:
   behaviour, 429 backoff, token refresh and invalidation, rate limiting, redacted
   endpoints.
 - Schema tests cover alias handling, optional fields, and `exclude_none` / `by_alias`
-  serialization of request bodies. Use the `examples` blocks in the swagger as fixtures —
-  they are real Strava payloads.
+  serialization of request bodies.
+- Response models are checked against `tests/fixtures/*.json`, extracted verbatim from the
+  swagger's `examples` blocks. Adding a fixture means adding a case in
+  `tests/test_fixtures.py` — and that case must **probe concrete values**, not merely
+  validate, since an all-optional model would pass against `{}`. A provenance test pins
+  each fixture to its spec example so one cannot be edited to rescue a failing model.
+- `tests/test_integration.py` runs one test per service through the real `Base` with a
+  fake session. Mock-based service tests cannot catch a wrong URL, a parameter that never
+  reaches the query string, or a response the model cannot parse; these do.
 - Test the serialization edge cases explicitly: CSV `bounds` and stream `keys`, epoch vs
   ISO date params, form-encoding of writes.
 - Architecture tests (`tests/test_architecture.py`) parse the AST of every source file and

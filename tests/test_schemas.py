@@ -8,14 +8,14 @@ ones.
 from datetime import UTC, datetime
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from strava_async.schemas.activity_model import (
     CreateActivityRequestBody,
     SummaryActivity,
     UpdateActivityRequestBody,
 )
-from strava_async.schemas.athlete_model import DetailedAthlete
+from strava_async.schemas.athlete_model import ClubAthlete, DetailedAthlete, SummaryAthlete
 from strava_async.schemas.club_model import DetailedClub
 from strava_async.schemas.gear_model import DetailedGear
 from strava_async.schemas.params import (
@@ -25,6 +25,7 @@ from strava_async.schemas.params import (
     PaginationParams,
     StreamParams,
 )
+from strava_async.schemas.route_model import Route
 from strava_async.schemas.segment_model import DetailedSegment, StarSegmentRequestBody
 from strava_async.schemas.stream_model import StreamSet
 from strava_async.schemas.upload_model import CreateUploadRequestBody, Upload
@@ -270,3 +271,37 @@ def test_parses_the_club_example() -> None:
 )
 def test_upload_completion_reflects_strava_s_terminal_states(payload: dict, complete: bool) -> None:
     assert Upload.model_validate(payload).is_complete is complete
+
+
+# --- Required identifiers ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "model",
+    [Route, Upload, DetailedSegment, DetailedGear, DetailedAthlete, SummaryActivity],
+    ids=lambda model: model.__name__,
+)
+def test_a_payload_without_an_id_is_rejected(model: type[BaseModel]) -> None:
+    """These once validated `{}` happily, so a misspelled field read as None forever.
+
+    Requiring the identifier turns that silent failure into a loud one.
+    """
+    with pytest.raises(ValidationError, match="id"):
+        model.model_validate({})
+
+
+def test_kudoers_still_parse_without_an_id() -> None:
+    """SummaryAthlete must stay permissive: a kudoer really is just two names."""
+    kudoer = SummaryAthlete.model_validate({"firstname": "Peter", "lastname": "S"})
+
+    assert kudoer.id is None
+    assert kudoer.firstname == "Peter"
+
+
+def test_club_members_still_parse_without_an_id() -> None:
+    member = ClubAthlete.model_validate(
+        {"resource_state": 2, "firstname": "Peter", "lastname": "S.", "membership": "member"}
+    )
+
+    assert member.id is None
+    assert member.membership == "member"

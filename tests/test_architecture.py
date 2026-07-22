@@ -23,11 +23,12 @@ ALLOWED_IMPORTS: dict[str, set[str] | str] = {
     "settings": set(),
     "protocols": set(),
     "exceptions": set(),
+    "rate_limit": set(),
     "auth": {"exceptions"},
     "schemas": {"schemas"},
     "services.base": {"protocols", "exceptions"},
     "services": {"services.base", "schemas", "protocols"},
-    "registry": {"services", "settings"},
+    "registry": {"services", "settings", "rate_limit", "protocols"},
     "client": {"services", "registry", "protocols"},
     "initialise": "*",
 }
@@ -130,7 +131,7 @@ def test_module_respects_its_layer(path: Path) -> None:
 
 
 def test_foundation_modules_import_nothing_internal() -> None:
-    for module in ("settings", "protocols", "exceptions"):
+    for module in ("settings", "protocols", "exceptions", "rate_limit"):
         tree = ast.parse((SRC / f"{module}.py").read_text())
         assert internal_imports(tree) == [], f"{module} must stay dependency-free"
 

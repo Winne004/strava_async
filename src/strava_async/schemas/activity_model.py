@@ -30,7 +30,7 @@ class SummaryActivity(ResponseModel):
     different instants expressed the same way, so do not convert between them.
     """
 
-    id: int | None = None
+    id: int
     resource_state: int | None = None
     external_id: str | None = None
     upload_id: int | None = None
@@ -103,7 +103,7 @@ class Split(ResponseModel):
 class Lap(ResponseModel):
     """A lap within an activity."""
 
-    id: int | None = None
+    id: int
     resource_state: int | None = None
     name: str | None = None
     activity: MetaActivity | None = None
@@ -134,7 +134,7 @@ class Comment(ResponseModel):
     The embedded athlete is a first and last name only — there is no id to follow.
     """
 
-    id: int | None = None
+    id: int
     activity_id: int | None = None
     post_id: int | None = None
     resource_state: int | None = None

@@ -28,7 +28,7 @@ class AthleteSegmentStats(ResponseModel):
 class SummarySegment(ResponseModel):
     """A segment as embedded in an effort or listed."""
 
-    id: int | None = None
+    id: int
     resource_state: int | None = None
     name: str | None = None
     activity_type: str | None = None
@@ -64,7 +64,7 @@ class DetailedSegment(SummarySegment):
 class ExplorerSegment(ResponseModel):
     """A segment as returned by the explorer, which has its own field names."""
 
-    id: int | None = None
+    id: int
     resource_state: int | None = None
     name: str | None = None
     climb_category: int | None = None

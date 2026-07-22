@@ -26,7 +26,7 @@ class DetailedSegmentEffort(ResponseModel):
     a personal record.
     """
 
-    id: int | None = None
+    id: int
     resource_state: int | None = None
     name: str | None = None
     activity: MetaActivity | None = None
